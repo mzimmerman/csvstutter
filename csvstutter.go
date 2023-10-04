@@ -43,11 +43,15 @@ func (reader Reader) Read(lineIn []byte) (int, error) {
 			if idx == -1 {
 				continue // no mulitple lines here
 			}
-			if line[x][:idx] != line[x][idx+1:] {
+			leftIdx := idx
+			if idx > 0 && line[x][idx-1] == '}' {
+				leftIdx--
+			}
+			if line[x][:leftIdx] != line[x][idx+1:] {
 				continue // not a stutter, not the same
 			}
 			// yes, we're a stutter value! remove it
-			line[x] = line[x][:idx]
+			line[x] = line[x][:leftIdx]
 		}
 		err = reader.writer.Write(line)
 		if err != nil {
