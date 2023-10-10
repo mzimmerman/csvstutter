@@ -8,11 +8,12 @@ import (
 )
 
 type Reader struct {
-	reader   *csv.Reader
-	done     chan error
-	toBeRead *bytes.Buffer
-	toWrite  chan []string
-	writer   *csv.Writer
+	reader         *csv.Reader
+	done           chan error
+	toBeRead       *bytes.Buffer
+	toWrite        chan []string
+	writer         *csv.Writer
+	linesProcessed [][]string
 }
 
 func NewReader(rdr io.Reader) *Reader {
@@ -21,11 +22,12 @@ func NewReader(rdr io.Reader) *Reader {
 	reader.FieldsPerRecord = -1 // disabling this check
 	buf := &bytes.Buffer{}
 	r := &Reader{
-		reader:   reader,
-		done:     make(chan error),
-		toBeRead: buf,
-		toWrite:  make(chan []string, 100),
-		writer:   csv.NewWriter(buf),
+		reader:         reader,
+		done:           make(chan error),
+		toBeRead:       buf,
+		toWrite:        make(chan []string, 100),
+		writer:         csv.NewWriter(buf),
+		linesProcessed: make([][]string, 0, 10),
 	}
 	go func() {
 		// read and unstutter them!
@@ -83,16 +85,31 @@ func (reader *Reader) Close() {
 // if there's an error all subsequent calls to Read will fail with the same error
 func (reader *Reader) Read(lineIn []byte) (int, error) {
 	if reader.toBeRead.Len() == 0 {
-		select {
-		case line, ok := <-reader.toWrite:
-			if !ok {
-				return 0, io.EOF
-			}
-			reader.writer.Write(line)
-			reader.writer.Flush()
-		case err := <-reader.done:
-			return 0, err
+		line, ok := <-reader.toWrite
+		if !ok {
+			return 0, io.EOF
 		}
+		reader.linesProcessed = append(reader.linesProcessed, line)
+	ReadLines:
+		for {
+			select {
+			case line, ok = <-reader.toWrite:
+				if !ok {
+					break ReadLines
+				}
+				reader.linesProcessed = append(reader.linesProcessed, line)
+			default:
+				break ReadLines
+			}
+		}
+		reader.writer.WriteAll(reader.linesProcessed)
+		reader.writer.Flush()
+		reader.linesProcessed = reader.linesProcessed[:0]
+	}
+	select {
+	case err := <-reader.done:
+		return 0, err
+	default:
 	}
 	return reader.toBeRead.Read(lineIn)
 }
