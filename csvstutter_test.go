@@ -38,7 +38,27 @@ csv,is,fun
 
 var bigResults = [][]string{}
 
-func BenchmarkStutter(b *testing.B) {
+func BenchmarkStutter1(b *testing.B) {
+	benchmarkStutter(b, 1)
+}
+
+func BenchmarkStutter2(b *testing.B) {
+	benchmarkStutter(b, 2)
+}
+
+func BenchmarkStutter10(b *testing.B) {
+	benchmarkStutter(b, 10)
+}
+
+func BenchmarkStutter100(b *testing.B) {
+	benchmarkStutter(b, 100)
+}
+
+func BenchmarkStutter1000(b *testing.B) {
+	benchmarkStutter(b, 1000)
+}
+
+func benchmarkStutter(b *testing.B, size int) {
 	dataIn, err := os.ReadFile("data.out")
 	if err != nil {
 		log.Fatalf("error reading in file for testing")
