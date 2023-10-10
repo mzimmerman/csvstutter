@@ -1,7 +1,11 @@
 package csvstutter_test
 
 import (
+	"bytes"
+	"encoding/csv"
 	"io/ioutil"
+	"log"
+	"os"
 	"strings"
 	"testing"
 
@@ -27,5 +31,24 @@ csv,is,fun
 	}
 	if expected != string(got) {
 		t.Errorf("\nexpected: %q\ngot     : %q", expected, got)
+	}
+}
+
+var bigResults = [][]string(nil)
+
+func BenchmarkStutter(b *testing.B) {
+	dataIn, err := os.ReadFile("data.out")
+	if err != nil {
+		log.Fatalf("error reading in file for testing")
+	}
+	b.ResetTimer()
+	b.StartTimer()
+	for i := 0; i < b.N; i++ {
+		stutter := csvstutter.NewReader(bytes.NewReader(dataIn))
+		results, err := csv.NewReader(stutter).ReadAll()
+		if err != nil {
+			b.Errorf("error reading csv - %v", err)
+		}
+		bigResults = results
 	}
 }
