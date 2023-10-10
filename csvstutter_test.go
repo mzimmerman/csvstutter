@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"math/rand"
 	"os"
@@ -27,7 +27,7 @@ another line
 csv,is,fun
 `
 
-	got, err := ioutil.ReadAll(csvstutter.NewReader(strings.NewReader(data)))
+	got, err := io.ReadAll(csvstutter.NewReader(strings.NewReader(data)))
 	if err != nil {
 		t.Errorf("got unexpected error reading - %v", err)
 	}
