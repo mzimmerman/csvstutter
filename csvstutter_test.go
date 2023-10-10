@@ -27,7 +27,7 @@ another line
 csv,is,fun
 `
 
-	got, err := io.ReadAll(csvstutter.NewReader(strings.NewReader(data)))
+	got, err := io.ReadAll(csvstutter.NewReader(strings.NewReader(data), 10))
 	if err != nil {
 		t.Errorf("got unexpected error reading - %v", err)
 	}
@@ -46,7 +46,7 @@ func BenchmarkStutter(b *testing.B) {
 	b.ResetTimer()
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
-		stutter := csvstutter.NewReader(bytes.NewReader(dataIn))
+		stutter := csvstutter.NewReader(bytes.NewReader(dataIn), 10)
 		results, err := csv.NewReader(stutter).ReadAll()
 		if err != nil {
 			b.Errorf("error reading csv - %v", err)

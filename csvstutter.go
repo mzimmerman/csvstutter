@@ -11,12 +11,12 @@ type Reader struct {
 	reader         *csv.Reader
 	done           chan error
 	toBeRead       *bytes.Buffer
-	toWrite        chan []string
+	toWrite        chan [][]string
 	writer         *csv.Writer
 	linesProcessed [][]string
 }
 
-func NewReader(rdr io.Reader) *Reader {
+func NewReader(rdr io.Reader, size int) *Reader {
 	reader := csv.NewReader(rdr)
 	reader.LazyQuotes = true
 	reader.FieldsPerRecord = -1 // disabling this check
@@ -25,7 +25,7 @@ func NewReader(rdr io.Reader) *Reader {
 		reader:         reader,
 		done:           make(chan error),
 		toBeRead:       buf,
-		toWrite:        make(chan []string, 100),
+		toWrite:        make(chan [][]string, size),
 		writer:         csv.NewWriter(buf),
 		linesProcessed: make([][]string, 0, 10),
 	}
@@ -34,9 +34,16 @@ func NewReader(rdr io.Reader) *Reader {
 		defer func() {
 			close(r.toWrite)
 		}()
+		toSend := make([][]string, 0, size)
 		for {
 			line, err := reader.Read()
 			if err == io.EOF {
+				select {
+				case _, ok := <-r.done:
+					_ = ok // we don't use this but I need to receive a value for the compiler
+					// done processing
+				case r.toWrite <- toSend:
+				}
 				return
 			}
 			if err != nil {
@@ -64,12 +71,16 @@ func NewReader(rdr io.Reader) *Reader {
 				// yes, we're a stutter value! remove it
 				line[x] = line[x][:leftIdx]
 			}
-			select {
-			case _, ok := <-r.done:
-				_ = ok // we don't use this but I need to receive a value for the compiler
-				// done processing
-			case r.toWrite <- line:
-				// log.Printf("sent line toWrite")
+			toSend = append(toSend, line)
+			if len(toSend) == size {
+				select {
+				case _, ok := <-r.done:
+					_ = ok // we don't use this but I need to receive a value for the compiler
+					// done processing
+				case r.toWrite <- toSend:
+					toSend = make([][]string, 0, size)
+					// log.Printf("sent line toWrite")
+				}
 			}
 		}
 	}()
@@ -89,7 +100,7 @@ func (reader *Reader) Read(lineIn []byte) (int, error) {
 		if !ok {
 			return 0, io.EOF
 		}
-		reader.linesProcessed = append(reader.linesProcessed, line)
+		reader.linesProcessed = append(reader.linesProcessed, line...)
 	ReadLines:
 		for {
 			select {
@@ -97,7 +108,7 @@ func (reader *Reader) Read(lineIn []byte) (int, error) {
 				if !ok {
 					break ReadLines
 				}
-				reader.linesProcessed = append(reader.linesProcessed, line)
+				reader.linesProcessed = append(reader.linesProcessed, line...)
 			default:
 				break ReadLines
 			}
